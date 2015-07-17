@@ -1,0 +1,58 @@
+<!doctype html>
+<html>
+
+<head>
+
+<script>
+
+var canvas, context;
+var circle;
+
+window.onload = function() {
+	canvas = document.getElementById("canvas");
+	context = canvas.getContext("2d");
+	
+	context.fillStyle = "rgb(0,0,0)";
+	context.fillRect(0,0,canvas.width,canvas.height);
+	
+	var radius = 20;
+	
+	circle = [];
+	var maxalpha = 0;
+	for (var i = 0; i<radius;i++) {
+		for (var j = 0; j<radius; j++) {
+			var c = 2 * Math.round(radius/2) / 2 - 1; //center
+			var alpha = Math.sqrt((i-c)*(i-c) + (j-c)*(j-c));
+			//if (alpha < radius) {
+				circle.push({
+					"x": i,
+					"y": j,
+					"a": alpha
+				});
+				if (alpha > maxalpha) maxalpha = alpha;
+			//}
+		}
+	}
+	
+	
+	circle.forEach(function(p) {
+		p.a = 1.0 - p.a / maxalpha; //normalize and invert
+		p.a = p.a * p.a; //increase contrast
+	});
+	
+	circle.forEach(function(p) {
+		context.fillStyle = "rgba(255,255,255," + p.a + ")";
+		context.fillRect(p.x * 32, p.y * 32, 31, 31);
+	});
+	
+};
+	
+</script>
+
+</head>
+
+<body>
+<canvas id="canvas" width="640" height="480"></canvas>
+</body>
+	
+</html>

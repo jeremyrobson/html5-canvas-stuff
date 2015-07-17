@@ -1,0 +1,125 @@
+<!doctype html>
+<html>
+<head>
+	
+<script>
+
+var canvas, context;
+var circles;
+var time;
+var out;
+var ocean, sky;
+
+function create_circle(radius) {
+	var circle = [];
+	var maxalpha = 0;
+	for (var i = 0; i<radius;i++) {
+		for (var j = 0; j<radius; j++) {
+			var c = 2 * Math.round(radius/2) / 2 - 1; //center rounded to nearest odd number
+			var alpha = Math.sqrt((i-c)*(i-c) + (j-c)*(j-c));
+			if (alpha < 3) {
+				circle.push({
+					"x": i,
+					"y": j,
+					"a": alpha
+				});
+				if (alpha > maxalpha) maxalpha = alpha;
+			}
+		}
+	}
+	
+	circle.forEach(function(p) {
+		p.a = 1.0 - p.a / maxalpha; //normalize and invert
+		p.a = p.a * p.a; //increase contrast
+	});
+	
+	return circle;
+}
+
+function create_particle() {
+	var x, y, alpha, vel, size, circle, life, max;
+	
+	var reset = function() {
+		x = Math.random() * canvas.width - 50;
+		y = Math.random() * Math.random() * canvas.height / 2 + 240;
+		alpha = 0.0;
+		vel = (y-240) / canvas.height* 0.01 * Math.random() + 0.0005;
+		size = Math.floor((y-240) / canvas.height * 10);
+		circle = create_circle(size+2);
+		life = 0;
+		max = Math.floor(Math.random() * 20);
+	};
+	
+    var draw = function(ctx, dt) {
+		x = x + vel * dt;
+		if (x > canvas.width || life > max)
+			reset();
+		
+		life = life + 0.01 * Math.random();
+		alpha = Math.sin(life * Math.PI) + Math.random() * 0.1;
+		
+		circle.forEach(function(p) {
+			context.fillStyle = "rgba(255,255,255," + p.a * alpha + ")";
+			context.fillRect(x + p.x * 2, y + p.y * 2, 2, 2);
+		});
+
+	};
+	
+	reset();
+	
+	return {
+		x: x,
+		y: y,
+		alpha: alpha,
+		life: life,
+		vel: vel,
+		size: size,
+		circle: circle,
+		draw: draw
+	};
+};
+
+function loop() {
+	window.requestAnimationFrame(loop);
+	
+	var now = new Date().getTime(),
+    dt = now - (time || now);
+ 
+    time = now;
+ 
+ 	if (circles.length < 200) circles.push(create_particle());
+ 
+  	context.fillStyle = sky;
+	context.fillRect(0,0,canvas.width, canvas.height/2);
+ 	context.fillStyle = ocean;
+	context.fillRect(0,canvas.height/2,canvas.width, canvas.height);
+ 	circles.forEach(function(c) { c.draw(context, dt); });
+}
+
+window.onload = function() {
+	canvas = document.getElementById("canvas");
+	context = canvas.getContext("2d");
+	
+	circles = [];
+	
+	sky = context.createLinearGradient(0,0,0,canvas.height/2);
+	sky.addColorStop(0.90,"rgb(126,192,238)");
+	sky.addColorStop(1.0,"rgb(0,127,255)");
+	
+	ocean = context.createLinearGradient(0,canvas.height/2,0,canvas.height);
+	ocean.addColorStop(0,"rgb(0,127,255)");
+	ocean.addColorStop(1.0,"rgb(0,25,155)");
+	
+	out = document.getElementById("out");
+	
+	loop();
+};
+
+</script>
+	
+</head>
+<body>
+	<canvas id="canvas" width="640" height="480"></canvas>
+	<div id="out"></div>
+</body>
+</html>
