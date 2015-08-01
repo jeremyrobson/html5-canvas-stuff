@@ -1,0 +1,161 @@
+<!doctype html>
+<html>
+<head>
+<style>
+* {
+	margin: 0;
+	padding: 0;
+}
+</style>
+<script>
+var canvas, context;
+var cloudcanvas, cloudcontext;
+var glowcanvas, glowcontext;
+var offsetx=0;
+
+function wrap(n, max) {
+	if (n < 0) return n + max;
+	if (n >= max) return n % max;
+	return n;
+}
+
+function loop() {
+	offsetx+=0.2;
+	if (offsetx > canvas.width) offsetx = 0;
+	draw();
+	requestAnimationFrame(loop);
+}
+
+function draw() {
+	//clear background
+	context.globalCompositeOperation = "normal";
+	context.fillStyle = "rgba(5,5,20,1.0)";
+	context.fillRect(0, 0, canvas.width, canvas.height);
+
+	//draw moon
+	context.beginPath();
+    context.arc(canvas.width/2, canvas.height/2, 25, 0, 2 * Math.PI, false);
+    context.fillStyle = "rgba(255,255,225,1.0)";
+    context.fill();
+
+	//draw clouds
+	context.globalCompositeOperation = "normal";
+	context.drawImage(cloudcanvas, offsetx, 0, canvas.width, canvas.height);
+	context.drawImage(cloudcanvas, offsetx-canvas.width, 0, canvas.width, canvas.height);
+	
+	//draw moonglow
+	context.globalCompositeOperation = "multiply";
+	context.drawImage(glowcanvas, 0, 0, canvas.width, canvas.height);
+}
+
+window.onload = function() {
+	canvas = document.getElementById("canvas");
+	canvas.width = window.innerWidth;
+	canvas.height = window.innerHeight;
+	context = canvas.getContext("2d");
+	
+	cloudcanvas = document.createElement("canvas");
+	cloudcanvas.width = 640;
+	cloudcanvas.height = 480;
+	cloudcontext = cloudcanvas.getContext("2d");
+	
+	//cloud array
+	var p = [];
+	for (var x=0;x<cloudcanvas.width;x++) {
+		p[x] = [];
+		for (var y=0;y<cloudcanvas.height;y++) {
+			p[x][y] = 0.0;
+		}
+	}
+	
+	//create clouds
+	var bx=0; by=0;
+	for (var i=0; i<2000000; i++) {
+		p[bx][by] += 0.1;
+		
+		if (p[bx][by] > 1) p[bx][by] = 1.0;
+		
+		bx = wrap(bx + Math.floor(Math.random() * 3) - 1, cloudcanvas.width);
+		by = wrap(by + Math.floor(Math.random() * 3) - 1, cloudcanvas.height);
+		
+		if (Math.random() < 0.01) {
+			bx = Math.floor(Math.random() * cloudcanvas.width);
+			by = Math.floor(Math.random() * cloudcanvas.height);
+		}
+	}
+	
+	//blend array
+	var a = [];
+	for (var x=0;x<cloudcanvas.width;x++) {
+		a[x] = [];
+		for (var y=0;y<cloudcanvas.height;y++) {
+			a[x][y] = 0.0;
+		}
+	}
+	
+	//blend
+	var sum;
+	for (var x=0; x<cloudcanvas.width; x++) {
+		for (var y=0; y<cloudcanvas.height; y++) {
+			sum = 0;
+			for (var i=-1;i<=1;i++) {
+				for (var j=-1;j<=1;j++) {
+					sum += p[wrap(x+1,640)][wrap(y+j,480)];
+				}
+			}
+			a[x][y] = sum / 9;
+		}
+	}
+	
+	//draw clouds
+	for (var x=0;x<cloudcanvas.width;x++) {
+		for (var y=0;y<cloudcanvas.height;y++) {
+			var alpha = a[x][y];
+			
+			if (alpha >= 0.8) alpha = 1.0;
+
+			//increase contrast
+			var f = 1.01 * (alpha + 1) / (1.01 - alpha);
+			alpha = f * (alpha-0.5) + 0.5; 
+			
+			var c = 0;
+			if (alpha > 0.2 && alpha < 0.8) c = 50;
+			
+			cloudcontext.fillStyle = "rgba("+c+","+c+","+c+","+alpha+")";
+			cloudcontext.fillRect(x, y, 1, 1);
+		}
+	}
+	
+	//draw moonglow
+	glowcanvas = document.createElement("canvas");
+	glowcanvas.width = 640;
+	glowcanvas.height = 480;
+	glowcontext = glowcanvas.getContext("2d");
+	var gradient = glowcontext.createRadialGradient(320,240,1,320,240,240);
+	gradient.addColorStop(0, "rgba(255,255,255,1.0)");
+	gradient.addColorStop(1, "rgba(0,0,0,1.0)");
+	glowcontext.fillStyle = gradient;
+	glowcontext.fillRect(0,0,640,480);
+	
+	//draw stars
+	glowcontext.fillStyle = "rgb(255,255,255)";
+	for (var i=0; i<5000; i++) {
+		x = Math.floor(Math.random() * 640);
+		y = Math.floor(Math.random() * 480);
+		glowcontext.fillRect(x,y,1,1);
+	}
+		
+	requestAnimationFrame(loop);
+};
+
+window.onresize = function() {
+	canvas.width = window.innerWidth;
+	canvas.height = window.innerHeight;
+};
+	
+</script>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+</body>
+</html>
