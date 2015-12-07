@@ -1,7 +1,14 @@
 <!doctype html>
 <html>
 <head>
-	
+
+<style>
+* {
+    margin: 0;
+    padding: 0;
+}
+</style>
+
 <script>
 
 var canvas, context;
@@ -41,10 +48,10 @@ function create_particle() {
 	
 	var reset = function() {
 		x = Math.random() * canvas.width - 50;
-		y = Math.random() * Math.random() * canvas.height / 2 + 240;
+		y = Math.random() * Math.random() * canvas.height / 2 + canvas.height / 2;
 		alpha = 0.0;
-		vel = (y-240) / canvas.height* 0.01 * Math.random() + 0.0005;
-		size = Math.floor((y-240) / canvas.height * 10);
+		vel = (y-canvas.height / 2) / canvas.height * 0.01 * Math.random() + 0.0005;
+		size = Math.floor((y-canvas.height / 2) / canvas.height * 10);
 		circle = create_circle(size+2);
 		life = 0;
 		max = Math.floor(Math.random() * 20);
@@ -89,15 +96,17 @@ function loop() {
  
  	if (circles.length < 200) circles.push(create_particle());
  
-  	context.fillStyle = sky;
+  context.fillStyle = sky;
 	context.fillRect(0,0,canvas.width, canvas.height/2);
  	context.fillStyle = ocean;
 	context.fillRect(0,canvas.height/2,canvas.width, canvas.height);
  	circles.forEach(function(c) { c.draw(context, dt); });
 }
 
-window.onload = function() {
+function reset() {
 	canvas = document.getElementById("canvas");
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
 	context = canvas.getContext("2d");
 	
 	circles = [];
@@ -113,6 +122,14 @@ window.onload = function() {
 	out = document.getElementById("out");
 	
 	loop();
+}
+
+window.onload = function() {
+    reset();
+};
+
+window.onresize = function() {
+    reset();
 };
 
 </script>
