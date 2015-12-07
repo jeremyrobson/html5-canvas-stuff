@@ -95,8 +95,8 @@ function draw() {
 function mouse_move(e) {
 	mx = e.offsetX;
 	my = e.offsetY;
-	//roll = Math.PI * (mx-128)/256 * 2;
-	//pitch = Math.PI * (my)/256 * 2;
+	roll = Math.PI * (mx-128)/256 * 2;
+	pitch = Math.PI * (my)/256 * 2;
 	horizon = 128;
 	document.getElementById("pitch").value = pitch;
 }
