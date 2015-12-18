@@ -1,0 +1,92 @@
+<!doctype html>
+<html>
+<head>
+
+<style>
+
+* {
+	padding: 0;
+	margin: 0;
+}
+
+</style>
+
+<script src="map.js"></script>
+<script>
+
+var canvas, context, map;
+var mapx, mapy, mapwidth, mapheight, mapvx, mapvy;
+var mx, my;
+
+function loop() {
+	mapwidth = Math.floor(canvas.width / 16);
+	mapheight = Math.floor(canvas.height / 16);
+
+	map_scroll();
+	
+	draw();
+	window.requestAnimationFrame(loop);
+}
+
+function draw() {
+	context.fillStyle = "rgb(0, 0, 0)";
+	context.fillRect(0, 0, canvas.width, canvas.height);
+	
+	draw_map(context, map, mapx, mapy, mapwidth, mapheight);
+}
+
+function map_scroll() {
+	mapx += mapvx;
+	mapy += mapvy;
+	
+	if (mapx < 0) mapx = 0;
+	if (mapx + mapwidth > 255) mapx = 255 - mapwidth;
+	
+	if (mapy < 0) mapy = 0;
+	if (mapy + mapheight > 255) mapy = 255 - mapheight;
+}
+
+function mouse_move(e) {
+	mx = e.offsetX;
+	my = e.offsetY;
+	
+	mapvx = 0;
+	mapvy = 0;
+	
+	if (mx < 50) mapvx = -1;
+	if (mx > mapwidth * 16 * 0.9) mapvx = 1;
+	
+	if (my < 50) mapvy = -1;
+	if (my > mapheight * 16 * 0.9) mapvy = 1;
+}
+
+function resize() {
+	canvas.width = window.innerWidth;
+	canvas.height = window.innerHeight;
+}
+
+window.onload = function() {
+	canvas = document.getElementById("canvas");
+	context = canvas.getContext("2d");
+	window.onresize = resize;
+	window.onmousemove = mouse_move;
+	
+	map = create_map();
+	mapx = 0;
+	mapy = 0;
+	mapvx = 0;
+	mapvy = 0;
+	
+	resize();
+	window.requestAnimationFrame(loop);
+};
+
+</script>
+
+</head>
+</body>
+
+<canvas id="canvas"></canvas>
+
+</body>
+</html>
