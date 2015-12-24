@@ -1,0 +1,386 @@
+<!doctype html>
+<html>
+<head>
+<script>
+
+var canvas, context;
+var players, units;
+var pause;
+
+var unittemplates = {
+    "castle": {
+        "subtype": "building",
+        "cost": 1000,
+        "value": 12,
+        "limit": 3,
+        "maxhp": 250,
+        "width": 48,
+        "height": 48,
+        "buildtime": 200,
+        "builds": ["worker"],
+        "buildrange": 5,
+        "speed": 0
+    },
+    "barracks": {
+        "subtype": "building",
+        "cost": 350,
+        "value": 11,
+        "limit": 5,
+        "maxhp": 150,
+        "width": 32,
+        "height": 48,
+        "buildtime": 150,
+        "builds": ["soldier", "soldier", "soldier", "archer", "archer", "catapult"],
+        "buildrange": 5,
+        "speed": 0
+    },
+    "tower": {
+        "subtype": "building",
+        "cost": 200,
+        "value": 10,
+        "limit": 10,
+        "maxhp": 100,
+        "width": 16,
+        "height": 32,
+        "buildtime": 100,
+        "damage": [2, 4],
+        "range": 96,
+        "interval": 40,
+        "speed": 0
+    },
+    "worker": {
+        "subtype": "mobile",
+        "cost": 50,
+        "value": 4,
+        "limit": 10,
+        "sprite": "W",
+        "maxhp": 15,
+        "width": 8,
+        "height": 16,
+        "buildtime": 50,
+        "builds": ["barracks", "barracks", "barracks", "tower", "tower"],
+        "buildrange": 100,
+        "range": 8,
+        "speed": 2
+    },
+    "soldier": {
+        "subtype": "mobile",
+        "cost": 75,
+        "value": 1,
+        "limit": 25,
+        "sprite": "S",
+        "maxhp": 30,
+        "width": 8,
+        "height": 16,
+        "buildtime": 60,
+        "damage": [2, 3],
+        "range": 16,
+        "interval": 30,
+        "speed": 2
+    },
+    "archer": {
+        "subtype": "mobile",
+        "cost": 75,
+        "value": 2,
+        "limit": 25,
+        "sprite": "A",
+        "maxhp": 25,
+        "width": 8,
+        "height": 16,
+        "buildtime": 100,
+        "damage": [1, 2],
+        "range": 64,
+        "interval": 50,
+        "speed": 3
+    },
+    "catapult": {
+        "subtype": "mobile",
+        "cost": 125,
+        "value": 3,
+        "limit": 10,
+        "sprite": "C",
+        "maxhp": 50,
+        "width": 16,
+        "height": 16,
+        "buildtime": 80,
+        "damage": [4, 5],
+        "range": 128,
+        "spread": 5, //todo
+        "interval": 200,
+        "speed": 1
+    }
+};
+
+var randint = function(min, max) { return Math.floor(Math.random() * (max - min)) + min; };
+
+function resolve_color(c) {
+    return "rgba(" + c[0] + "," + c[1] + "," + c[2] + "," + c[3] + ")";
+}
+
+var Player = function(name, c) {
+    this.name = name;
+    this.gold = 500;
+    this.c = c;
+    this.unittotal = 0;
+    this.unitcount = {};
+    for (var key in unittemplates)
+        this.unitcount[key] = 0;   
+};
+
+Player.prototype.purchase = function(cost) {
+    this.gold -= cost;  
+};
+
+var HealthBar = function() {
+      
+};
+
+HealthBar.prototype.draw = function(unit) {
+    context.fillStyle = "rgb(255,0,0)";
+    context.fillRect(unit.x, unit.y + 20, 16, 4);
+    context.fillStyle = "rgb(0,255,0)";
+    context.fillRect(unit.x, unit.y + 20, 16 * unit.hp / unit.maxhp, 4);
+    context.strokeStyle = "rgb(255,255,0)";
+    context.strokeRect(unit.x, unit.y + 20, 16, 4);
+};
+
+var Unit = function(player, type, x, y, buildstatus, parent, target) {
+    for (var key in unittemplates[type])
+        this[key] = unittemplates[type][key];
+    
+    this.id = randint(0, 10000000);
+    this.player = player;
+    this.type = type;
+    this.x = x;
+    this.y = y;
+    this.hp = this.maxhp;
+    this.gauge = this.interval || 0;
+    this.buildstatus = buildstatus || 0;
+    this.parent = parent;
+    this.target = target;
+    this.healthbar = new HealthBar();
+    this.c = player.c.slice(0);
+};
+
+function get_distance(a, b) {
+    var dx = b.x - a.x;
+    var dy = b.y - a.y;
+    return Math.sqrt(dx*dx+dy*dy);   
+}
+
+Unit.prototype.move = function() {
+    var angle = Math.atan2(this.target.y-this.y, this.target.x-this.x);
+    this.vx = Math.cos(angle) * this.speed;
+    this.vy = Math.sin(angle) * this.speed;
+    this.x += this.vx;
+    this.y += this.vy;
+};
+
+Unit.prototype.acquire_target = function() {
+    var list = units.filter(function(u) {
+        //filter out allies, dead units, and self
+        return u.player != this.player && u.hp > 0 && u.id != this.id;
+    }, this).sort(function(a, b) {
+        var aa = a.value;
+        
+        //more likely to target units within attack range
+        if (get_distance(a, this) < this.range) aa += 100;
+        
+        return aa > b.value;
+    }, this);
+    
+    this.target = list[0];
+    
+    //pause = true;
+    
+    //console.log(list);
+}
+
+Unit.prototype.select_build_type = function() {
+    var availablebuildings = this.builds.filter(function(b) {
+        if (unittemplates[b].cost <= this.player.gold && //if build type can be afforded
+            this.player.unitcount[b] < unittemplates[b]["limit"]) // and build type is not at count limit
+            return b;
+    }, this);
+    
+    //returns undefined if no buildings are available
+    return availablebuildings[randint(0, availablebuildings.length)];
+};
+
+Unit.prototype.get_build_location = function() {
+    var x = this.x + randint(-this.buildrange, this.buildrange);
+    var y = this.y + randint(-this.buildrange, this.buildrange);
+    if (x < 0) x = randint(0, this.buildrange);
+    if (y < 0) y = randint(0, this.buildrange);
+    if (x > 640) x = randint(640-this.buildrange, 640);
+    if (y > 480) y = randint(480-this.buildrange, 480);
+    return {"x": x, "y": y};
+};
+
+Unit.prototype.repair = function() {
+    if (this.target.buildstatus < 1) //if unit is not built
+        this.target.buildstatus += 0.001;
+    else //unit is done being built
+        this.target = null;
+};
+
+Unit.prototype.attack = function() {
+    if (this.gauge >= this.interval) { //if gague is full
+        var damage = randint(this.damage[0], this.damage[1]) + 1; 
+        this.target.defend(this, damage);
+        this.gauge = 0;
+    }
+};
+
+Unit.prototype.defend = function(attacker, damage) {
+    if (this.damage) // if unit can fight back
+        this.target = attacker;
+    this.hp -= damage;
+    if (this.hp <= 0) this.die();
+};
+
+Unit.prototype.die = function() {
+    this.hp = 0;
+    this.player.unittotal--;
+    this.player.unitcount[this.type]--; //decrement count from unit dictionary
+    if (this.player.unittotal <= 0)
+        console.log(this.player.name + " loses!");
+};
+
+Unit.prototype.loop = function() {
+    if (this.target) { //if unit has a target
+        if (this.target.hp > 0) //if target is alive
+        {
+            if (get_distance(this, this.target) > this.range) { //if not in range
+                //check for closer target
+                this.move(); //move into range
+            }
+            else { //if in range
+                if (this.builds) { //if unit can build
+                    this.repair(); //repair (or continue building) unit
+                }
+                else { //if unit cannot build
+                    this.attack(); //attack the target
+                }
+            }
+        }
+        else //target was destroyed
+            this.target = null; //get new target
+    }
+    else { //if unit has no target
+        if (this.buildstatus >= 1) { //if the unit is completed
+             if (this.builds) { //if unit can build
+                var buildtype = this.select_build_type();
+                if (buildtype) { //if a build type was selected
+                    var cost = unittemplates[buildtype].cost;
+                    this.player.purchase(cost);
+                    var p = this.get_build_location();
+                    this.target = add_unit(this.player, buildtype, p.x, p.y);
+                }
+                else { //if a building type was not selected
+                    //todo: repair a nearby damaged building
+                }
+            }
+            else { //if unit can fight
+                this.acquire_target(); //find a target to attack
+            }
+        }
+        else { //if the unit is not completed yet
+            if (this.parent && this.parent.hp == 0) //if parent unit is dead
+                this.hp = 0; //commit seppoku
+        }
+    }
+    
+    if (this.gauge < this.interval)
+        this.gauge++;
+    
+    this.c[3] = this.buildstatus;
+    this.color = resolve_color(this.c);
+};
+
+Unit.prototype.draw = function() {
+    var drawx = this.x-this.width/2;
+    var drawy = this.y-this.height/2;
+    
+    context.strokeStyle = this.color;
+    context.fillStyle = this.color;
+    
+    if (this.subtype == "building") {  
+        context.strokeRect(drawx, drawy, this.width, this.height);
+    }
+    else {
+        context.font = "24px Arial";
+        context.fillText(this.sprite, drawx, drawy);
+    }
+    
+    if (this.target) {
+        context.beginPath();
+        context.moveTo(this.x, this.y);
+        context.lineTo(this.target.x, this.target.y);
+        context.stroke();
+    }
+    
+    this.healthbar.draw(this);
+};
+
+function add_unit(player, type, x, y, buildstatus, parent, target) {
+    var newunit = new Unit(player, type, x, y, buildstatus, parent, target);
+    units.push(newunit);
+    player.unitcount[type]++;
+    player.unittotal++;
+    return newunit;
+}
+
+function loop() {
+    players.forEach(function(p) {
+        p.gold += 1; 
+    });
+    
+    units.forEach(function(u) {
+        if (u.hp > 0) u.loop();
+    });
+    
+    draw();
+    
+    if (!pause) window.requestAnimationFrame(loop);
+}
+
+function draw() {
+    context.fillStyle = "rgb(0,0,0)";
+    context.fillRect(0,0,640,480);
+    
+    units.forEach(function(u) {
+        if (u.hp > 0) u.draw(); 
+    });
+    
+    players.forEach(function(p, i) {
+        context.fillStyle = resolve_color(p.c);
+        context.font = "24px Arial";
+        context.fillText("Gold: " + p.gold, i * 200 + 200, 0);
+        context.fillText("Units: " + p.unittotal, i * 200 + 200, 24);
+    });
+}
+
+window.onload = function() {
+    canvas = document.getElementById("canvas");
+    context = canvas.getContext("2d");
+    context.textBaseline = "top";
+    
+    units = [];
+    
+    players = [new Player("user", [0,155,0,1]), new Player("cpu", [155,0,0,1])];  
+ 
+    add_unit(players[0], "worker", 40, 40, 1, null, add_unit(players[0], "castle", 50, 50));
+    add_unit(players[1], "worker", 440, 440, 1, null, add_unit(players[1], "castle", 450, 450));
+    
+    window.requestAnimationFrame(loop);
+};
+
+</script>
+</head>
+<body>
+
+<canvas id="canvas" width="640" height="480"></canvas>
+
+</body>
+</html>
