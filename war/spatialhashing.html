@@ -1,0 +1,227 @@
+<!doctype html>
+<html>
+<head>
+<script>
+var canvas, context;
+var units, board;
+var QUAD_SIZE = 32;
+
+function get_distance(obj1, obj2) {
+    var dx = obj2.x-obj1.x;
+    var dy = obj2.y-obj1.y;
+    return Math.sqrt(dx*dx+dy*dy);
+}
+
+var Unit = function(x, y) {
+    this.id = Math.floor(Math.random() * 1000000);
+    this.size = Math.floor(Math.random() * 16) + 4;
+    this.color = "rgb(255,255,255)";
+    this.x = x;
+    this.y = y;
+    this.velx = Math.random() * 5 - 2.5;
+    this.vely = Math.random() * 5 - 2.5;
+    this.qx = Math.floor(this.x / QUAD_SIZE);
+    this.qy = Math.floor(this.y / QUAD_SIZE);
+    this.target = null;
+    this.range = 16;
+    this.hp = 50;
+}
+
+Unit.prototype.loop = function() {
+    if (this.hp <= 0) return;
+    
+    if (this.target) {
+        var distance = get_distance(this, this.target);
+        if (distance < this.range)
+            this.target.die();
+        
+        if (this.target.hp <= 0)
+            this.target = null;
+    }
+    //else
+        this.get_target();
+
+    this.move();
+};
+
+Unit.prototype.move = function() {
+    if (this.target) {
+        var dx = this.target.x - this.x;
+        var dy = this.target.y - this.y;
+        var angle = Math.atan2(dy, dx);
+        this.velx = Math.cos(angle);
+        this.vely = Math.sin(angle);
+    }
+    else {
+        this.velx = 0;
+        this.vely = 0;   
+    }
+    
+    this.x += this.velx;
+    this.y += this.vely;
+    
+    if (this.x < 0) this.x = 0;
+    if (this.y < 0) this.y = 0;
+    if (this.x >= 512) this.x = 511;
+    if (this.y >= 512) this.y = 511;
+    
+    var newqx = Math.floor(this.x / QUAD_SIZE);
+    var newqy = Math.floor(this.y / QUAD_SIZE);
+    
+    if (newqx != this.qx || newqy != this.qy) {
+        board.update_unit(this, newqx, newqy);
+    }
+}
+
+Unit.prototype.get_target = function() {
+    var range = 1;
+    for (var range=1; range < 16; range++) {
+        var unitlist = board.get_units_in_range(this, range);
+
+        unitlist = unitlist.filter(function(u) {
+            return u.id != this.id && u.hp > 0;
+        }, this);
+
+        this.target = unitlist[0];
+        if (this.target) break;
+    }
+};
+
+Unit.prototype.die = function() {
+    this.hp = 0;
+    this.color = "rgb(50,50,50)";  
+};
+
+Unit.prototype.draw = function(ctx) {
+    ctx.fillStyle = this.color;
+    ctx.fillRect(this.x - this.size/2, this.y-this.size/2, this.size, this.size);   
+};
+
+function create_rect(x1, y1, x2, y2) {
+    return {
+        x1:x1,y1:y1,x2:x2,y2:y2,w:x2-x1,h:y2-y1,hit:function(x,y) {
+            return x >= x1 && y >= y1 && x < x2 && y < y2;   
+        }  
+    };  
+}
+
+var Quad = function(rect) {
+    this.rect = rect;
+    this.arr = [];
+};
+
+var Board = function(rect) {
+    this.quad = [];
+    this.hash = {};
+    this.gridcolors = ["rgba(255,0,0,0.75)","rgba(255,255,0,0.75)","rgba(0,255,0,0.75)","rgba(0,255,0,0.75)","rgba(255,255,255,1.0)"];
+    
+    for (var x=0;x<16;x++) {
+        this.quad[x] = [];
+        for (var y=0;y<16;y++) {
+            this.quad[x][y] = new Quad(create_rect(x*32,y*32,x*32+32,y*32+32));
+        }
+    }
+};
+
+Board.prototype.add_unit = function(unit) {
+    //this.hash[unit.id] = node; //todo: change unit array in each quad to doubly linked list, hash references node for easy removal
+    try {
+        this.quad[unit.qx][unit.qy].arr.push(unit);
+    } catch(e) {
+        console.log(unit);   
+    }
+};
+
+Board.prototype.remove_unit = function(unit) {
+    this.quad[unit.qx][unit.qy].arr = this.quad[unit.qx][unit.qy].arr.filter(function(u) {
+        return u.id != unit.id; 
+    });  
+};
+
+Board.prototype.update_unit = function(unit, newqx, newqy) {
+    this.remove_unit(unit);
+    unit.qx = newqx;
+    unit.qy = newqy;
+    this.add_unit(unit);
+};
+
+Board.prototype.get_units_in_range = function(unit, range) {
+    var unitlist = [];
+    for (var i=-range;i<=range;i++) {
+        for (var j=-range; j<=range; j++) {
+               var qx = unit.qx + i;
+               var qy = unit.qy + j;
+               if (qx<0||qy<0||qx>=16||qy>=16) continue;
+               unitlist = unitlist.concat(board.quad[qx][qy].arr);
+        }   
+    }
+    return unitlist;
+};
+
+Board.prototype.draw = function(ctx) {
+    ctx.fillStyle = "rgb(255,255,0)";
+    ctx.font = "16px Arial";
+    ctx.textBaseline = "top";
+    for (var x=0;x<16;x++) {
+        for (var y=0; y<16; y++) {
+            var count = this.quad[x][y].arr.length;
+            ctx.strokeStyle = this.gridcolors[count];
+            var rect = this.quad[x][y].rect;
+            ctx.strokeRect(rect.x1, rect.y1, rect.w, rect.h);
+        }
+    }
+};
+
+function create_unit(x, y) {
+    var newunit = new Unit(x, y);
+    units.push(newunit);
+    board.add_unit(newunit);   
+}
+
+function loop() {
+    units.forEach(function(u) {
+       u.loop();
+    });
+    
+    draw();
+    window.requestAnimationFrame(loop);
+}
+
+function draw() {
+    context.fillStyle = "rgb(0,0,0)";
+    context.fillRect(0,0,512,512);
+    
+    units.forEach(function(u) {
+        u.draw(context);
+    });
+    
+    board.draw(context);
+}
+
+function mouse_down(e) {
+    mx = (e.layerX) ? e.layerX : e.offsetX;
+    my = (e.layerY) ? e.layerY : e.offsetY;
+    
+    create_unit(mx, my);
+}
+
+window.onload = function() {
+    canvas = document.getElementById("canvas");
+    context = canvas.getContext("2d");
+    canvas.onmousedown = mouse_down;
+    
+    board = new Board(create_rect(0, 0, 512, 512));
+    
+    units = [];
+    
+    for (var i=0; i < 5; i++)
+        create_unit(Math.floor(Math.random() * 512), Math.floor(Math.random() * 512));
+    
+    window.requestAnimationFrame(loop);
+};
+</script>
+</head>
+<body>
+<canvas id="canvas" width="512" height="512"></canvas>
+</body>  
+</html>
