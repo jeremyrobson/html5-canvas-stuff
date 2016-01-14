@@ -12,6 +12,17 @@ function get_distance(obj1, obj2) {
     return Math.sqrt(dx*dx+dy*dy);
 }
 
+Array.prototype.pushfilter = function(fn, context) {
+    var res = [];
+    for (var idx = 0; idx < this.length; idx++) {
+        var currentItem = this[idx];
+        if (fn.bind(context)(currentItem)) {
+            res.push(currentItem);
+        }
+    }
+    return res;
+};
+
 var Unit = function(x, y) {
     this.id = Math.floor(Math.random() * 1000000);
     this.size = Math.floor(Math.random() * 16) + 4;
@@ -20,6 +31,7 @@ var Unit = function(x, y) {
     this.y = y;
     this.velx = Math.random() * 5 - 2.5;
     this.vely = Math.random() * 5 - 2.5;
+    this.speed = Math.random();
     this.qx = Math.floor(this.x / QUAD_SIZE);
     this.qy = Math.floor(this.y / QUAD_SIZE);
     this.target = null;
@@ -49,8 +61,8 @@ Unit.prototype.move = function() {
         var dx = this.target.x - this.x;
         var dy = this.target.y - this.y;
         var angle = Math.atan2(dy, dx);
-        this.velx = Math.cos(angle);
-        this.vely = Math.sin(angle);
+        this.velx = Math.cos(angle) * this.speed;
+        this.vely = Math.sin(angle) * this.speed;
     }
     else {
         this.velx = 0;
@@ -75,7 +87,7 @@ Unit.prototype.move = function() {
 
 Unit.prototype.get_target = function() {
     var range = 1;
-    for (var range=1; range < 16; range++) {
+    for (var range=1; range < 10; range++) {
         var unitlist = board.get_units_in_range(this, range);
 
         unitlist = unitlist.filter(function(u) {
@@ -89,7 +101,15 @@ Unit.prototype.get_target = function() {
 
 Unit.prototype.die = function() {
     this.hp = 0;
-    this.color = "rgb(50,50,50)";  
+    this.color = "rgb(50,50,50)";
+    
+    //remove self from board/quad
+    board.remove_unit(this);
+    
+    //remove self from units array
+    units = units.pushfilter(function(u) {
+        return u.id != this.id;
+    }, this);
 };
 
 Unit.prototype.draw = function(ctx) {
@@ -108,6 +128,12 @@ function create_rect(x1, y1, x2, y2) {
 var Quad = function(rect) {
     this.rect = rect;
     this.arr = [];
+};
+
+Quad.prototype.remove_unit = function(id) {
+    this.arr = this.arr.pushfilter(function(u) {
+        return u.id != id; 
+    });  
 };
 
 var Board = function(rect) {
@@ -133,9 +159,7 @@ Board.prototype.add_unit = function(unit) {
 };
 
 Board.prototype.remove_unit = function(unit) {
-    this.quad[unit.qx][unit.qy].arr = this.quad[unit.qx][unit.qy].arr.filter(function(u) {
-        return u.id != unit.id; 
-    });  
+    this.quad[unit.qx][unit.qy].remove_unit(unit.id);
 };
 
 Board.prototype.update_unit = function(unit, newqx, newqy) {
@@ -214,7 +238,7 @@ window.onload = function() {
     
     units = [];
     
-    for (var i=0; i < 5; i++)
+    for (var i=0; i < 1000; i++)
         create_unit(Math.floor(Math.random() * 512), Math.floor(Math.random() * 512));
     
     window.requestAnimationFrame(loop);
