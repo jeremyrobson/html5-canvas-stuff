@@ -1,0 +1,103 @@
+<!doctype html>
+<html>
+<head>
+<script>
+var canvas, context, interval;
+var width = 640, height = 480;
+var node; //no more array, now linked list
+
+var Node = function() {
+    this.reset();
+};
+
+Node.prototype.reset = function() {
+    this.x = Math.random() * width;
+    this.y = Math.random() * height;
+    this.vx = Math.random() * 5 - 2; //random velocity x between -2.0 and 2.0
+    this.vy = Math.random() * 5 - 2; //random velocity x between -2.0 and 2.0
+    this.radius = Math.random() * 10 + 4;
+    this.r = Math.floor(Math.random() * 156) + 100; //random char between 100 and 255
+    this.g = Math.floor(Math.random() * 156) + 100;
+    this.b = Math.floor(Math.random() * 156) + 100;
+    this.alpha = 0.0;
+};
+
+Node.prototype.move = function() {
+    this.x += this.vx;
+    this.y += this.vy;
+    
+    //reset if circle goes outside canvas
+    if ((this.x+this.radius) < 0 || this.x > width || (this.y+this.radius) < 0 || this.y > height)
+        this.reset();
+        
+    if (this.next) this.next.move();
+};
+
+Node.prototype.draw = function(ctx) {
+    if (this.next) {
+        var dx = this.x - this.next.x;
+        var dy = this.y - this.next.y;
+        var distance = Math.sqrt(dx * dx + dy * dy); //pythagoras distance formula
+        this.alpha = (height - distance) / height; //higher distance = less alpha
+        this.next.alpha = this.alpha;
+    }
+
+    this.color = "rgba(" + this.r + "," + this.g + "," + this.b + "," + this.alpha + ")";
+    
+    ctx.fillStyle = this.color;
+    ctx.fillRect(this.x, this.y, this.radius, this.radius);
+    
+    if (this.next) draw_line(ctx, this, this.next, this.color);
+    
+    if (this.next) this.next.draw(ctx);
+};
+
+function draw_line(ctx, p1, p2, color) {
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(p1.x, p1.y);
+    ctx.lineTo(p2.x, p2.y);
+    ctx.stroke();
+}
+
+//linked-list recursive creation function
+function add_circle(prev, index) {
+    if (index < 100) {
+        var newnode = new Node();
+        newnode.reset();
+        newnode.prev = prev;
+        newnode.next = add_circle(newnode, index + 1);
+        return newnode;
+    }
+    return null;
+}
+
+function loop() {
+    node.move();
+    
+    draw();
+}
+
+function draw() {
+    context.fillStyle = "rgb(50, 75, 100)";
+    context.fillRect(0, 0, width, height);
+    
+    node.draw(context);
+}
+
+window.onload = function() {
+    canvas = document.getElementById("canvas");
+    context = canvas.getContext("2d");
+    
+    node = add_circle(null, 0);
+    
+    interval = window.setInterval(loop, 1000/60); //60 FPS
+};
+
+</script>
+</head>
+<body>
+<canvas id="canvas" width="640" height="480"></canvas>
+</body>
+</html>

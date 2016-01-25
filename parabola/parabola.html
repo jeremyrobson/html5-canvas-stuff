@@ -1,0 +1,157 @@
+<!doctype html>
+<html>
+<head>
+<script>
+function randint(min, max) { return Math.floor(Math.random()*(max-min))+min; }
+var canvas, context;
+var arr = [];
+var lines = [];
+var xints = [];
+var a = -0.25, b = 3, c = -5;
+var vertex;
+function draw() {
+    context.strokeStyle = "rgb(0,0,0)";
+    context.lineWidth = 1;
+    for (var x=0;x<16;x++) {
+        for (var y=0;y<16;y++) {
+            context.strokeRect(x*32,y*32,32,32);
+        }
+    }
+    context.lineWidth = 5;
+    context.beginPath();
+    context.moveTo(0, 256);
+    context.lineTo(512, 256);
+    context.stroke();
+    context.moveTo(0, 0);
+    context.lineTo(0, 512);
+    context.stroke();
+    
+    context.fillStyle = "rgba(0,0,0,0.15)";
+    arr.forEach(function(a) {
+        context.fillRect(a.x*32,224-(a.y*32),31,31);
+    });
+    
+    context.strokeStyle = "rgb(255,0,0)";
+    context.lineWidth = 3;
+    lines.forEach(function(line, i) {
+        context.strokeStyle = "rgb("+randint(50,225)+","+randint(50,225)+","+randint(50,225)+")";
+        context.beginPath();
+        context.moveTo(line.x1*32, 256-(line.y1*32));
+        context.lineTo(line.x2*32, 256-(line.y2*32));
+        context.stroke();
+    });
+    
+    context.fillStyle = "rgb(0,0,255)";
+    xints.forEach(function(i) {
+        context.fillRect(i.x*32,256-(i.y*32),5,5);
+    });
+    
+    context.fillStyle = "rgb(0,255,0)";
+    context.fillRect(vertex.x*32,256-(vertex.y*32),3,3);
+}
+function fn(a, b, c, x) {
+    return a*x*x + b*x + c;
+}
+function discriminant(a, b, c) {
+    return b*b-4*a*c;
+}
+function get_roots(a, b, c) {
+    var det = Math.sqrt(discriminant(a, b, c));
+    var x1 = (-b + det) / (2*a);
+    var x2 = (-b - det) / (2*a);
+    return [x1, x2];
+}
+function get_slope(a, b, x) {
+    return 2 * a * x + b;
+}
+function get_vertex(a, b, c) {
+    var h = -b / (2 * a);
+    var k = fn(a, b, c, h);
+    return {"x": h, "y": k};
+}
+function intersection(L, b, y) {
+    var m = (L.y2 - L.y1) / (L.x2 - L.x1);
+    x = (y - b) / m;
+    return x;
+}
+function create_parabola() {
+    var x = 0;
+    var y = fn(a, b, c, x);  
+    vertex = get_vertex(a, b, c);
+    var p = {"x":x, "y":y}; //the next point after x,y
+    var last;
+    
+    for (var i=0;i<30;i++) {
+        if (x < vertex.x)
+            arr.push({"x":x,"y":y});
+        else
+            arr.push({"x":x,"y":y-1}); //fuuuuuuu
+        xints.push({"x":p.x, "y":p.y});
+        
+        var vx = 1, vy = 1; //vector determined by vertex
+        if (x < vertex.x)
+            vy = 1;
+        else if (x >= vertex.x)
+            vy = -1;
+        
+        var line = {
+            "x1": p.x,
+            "y1": p.y,
+            "x2": x+vx,
+            "y2": fn(a, b, c, x+vx)
+        };
+        
+        if (line.x1 == line.x2) { alert(last); }
+        
+        console.log(i, line, p.y, y+vy);
+        var dx = intersection(line, p.y, y+vy); //horizontal distance to x intercept
+        var dy = Math.abs(x+vx - p.x); //horizontal distance to y intercept
+        console.log(i,"dx:", dx, "dy:", dy);
+        
+        if (Math.abs(dx - dy) < 0.01) { //avoid floating-point inaccuracies at corners
+            x += vx;
+            y += vy;
+            p.x = x;
+            p.y = y;
+            last = "c";
+        }
+        else if (dx < dy)
+        {
+            y += vy;
+            p.x += dx;
+            p.y = y;
+            last = p.x;
+        }
+        else if (dx > dy) {
+            x += vx;
+            p.x = x;
+            p.y = fn(a, b, c, x);
+            last="b";
+        }
+        else
+            console.log("Error: dx or dy is invalid.", "dx:",dx,"dy:",dy);
+        
+        //if (x==vertex.x && y==vertex.y) {
+        //    y-=vy;
+        //}
+       
+        console.log(i,"x:", x, "y:", y, "px:", p.x, "py:", p.y);
+        
+        lines.push(line);
+    }
+}
+window.onload = function() {
+    canvas = document.getElementById("canvas");
+    context = canvas.getContext("2d");
+    
+    create_parabola();
+    
+    draw();
+};
+</script>
+</head>
+<body>
+
+<canvas id="canvas" width="512" height="512"></canvas>
+</body>
+</html>
