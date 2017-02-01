@@ -1,0 +1,159 @@
+<!doctype html>
+<html>
+
+    <head>
+        <script>
+            var canvas, context;
+            var grid;
+            var CANVAS_WIDTH = window.innerWidth, CANVAS_HEIGHT = window.innerHeight;
+            var CELL_WIDTH = 32, CELL_HEIGHT = 32;
+            var CELLS_WIDE = CANVAS_WIDTH / CELL_WIDTH;
+            var CELLS_HIGH = CANVAS_HEIGHT / CELL_HEIGHT;
+            var gen = 0;
+            var colors = ["rgb(25,25,25)","rgb(155,155,155)"];
+            var lastTick = 0;
+
+            function wrap(val, max) {
+                if (val >= max) return val % max;
+                if (val < 0) return max + val;
+                return val;
+            }
+
+            function getNeighborCount(x, y) {
+                var neighborCount = 0;
+                for (var i = -1; i < 2; i++) {
+                    for (var j = -1; j < 2; j++) {
+                        if (i===0 && j===0) continue;
+                        var nx = wrap(x + i, CELLS_WIDE);
+                        var ny = wrap(y + j, CELLS_HIGH);
+
+                        if (grid[0][nx][ny] === gen + 1) {
+                            neighborCount++;
+                        }
+                    }
+                }
+                return neighborCount;
+            }
+
+            function liveOrDie(x, y) {
+                var neighborCount = getNeighborCount(x, y);
+                var age = grid[0][x][y];
+
+                if (age === gen) { //cell is empty
+                    if (neighborCount === 3)
+                        return gen + 2;
+                    else
+                        return gen + 1;
+                }
+                else if (age === gen + 1) {
+                    if (neighborCount < 2)
+                        return gen + 1;
+                    else if (neighborCount > 3)
+                        return gen + 1;
+                    else
+                        return gen + 2;
+                }
+                else
+                    console.log("error");
+            }
+
+            function nextGen() {
+                grid[1] = [];
+                for (var x=0; x<CELLS_WIDE; x++) {
+                    grid[1][x] = [];
+                    for (var y=0; y<CELLS_HIGH; y++) {
+                        grid[1][x][y] = liveOrDie(x, y);
+                    }
+                }
+                grid[0] = grid[1];
+                gen++;
+                console.log("Generation: " + gen);
+            }
+
+            function loop() {
+
+                if (Date.now() > lastTick + 1000) {
+                    nextGen();
+                    lastTick = Date.now();
+                }
+
+                draw();
+                requestAnimationFrame(loop);
+            }
+
+            function draw() {
+                context.fillStyle = "rgb(0,0,0)";
+                context.fillRect(0,0,512,512);
+
+                var dx, dy;
+                var colorIndex;
+                for (var x=0; x<CELLS_WIDE; x++) {
+                    for (var y=0; y<CELLS_HIGH; y++) {
+                        dx = x * CELL_WIDTH;
+                        dy = y * CELL_HEIGHT;
+                        colorIndex = grid[0][x][y] - gen;
+                        context.fillStyle = colors[colorIndex];
+                        context.fillRect(dx, dy, CELL_WIDTH, CELL_HEIGHT);
+
+                        context.fillStyle = "rgb(0,0,255)";
+                        //context.fillText(grid[0][x][y], dx, dy);
+                    }
+                }
+            }
+
+            function generateRandomCells(num) {
+                for (var i=0; i<num; i++) {
+                    var randX = Math.floor(Math.random() * CELLS_WIDE);
+                    var randY = Math.floor(Math.random() * CELLS_HIGH);
+                    grid[0][randX][randY] = gen + 1;
+                }
+            }
+
+            function mouse_down(e) {
+                var cellX = Math.floor(e.offsetX / CELL_WIDTH);
+                var cellY = Math.floor(e.offsetY / CELL_HEIGHT);
+                grid[0][cellX][cellY] = gen + 1;
+                //nextGen();
+            }
+
+            function mouse_move(e) {
+                var cellX = Math.floor(e.offsetX / CELL_WIDTH);
+                var cellY = Math.floor(e.offsetY / CELL_HEIGHT);
+                var cell = grid[0][cellX][cellY];
+                var nc = getNeighborCount(cellX, cellY);
+                //console.log(nc);
+            }
+
+            window.onload = function() {
+                canvas = document.getElementById("canvas");
+                canvas.width = CANVAS_WIDTH;
+                canvas.height = CANVAS_HEIGHT;
+                canvas.onmousedown = mouse_down;
+                canvas.onmousemove = mouse_move;
+
+                context = canvas.getContext("2d");
+                context.textBaseline = "top";
+                context.font = "16px Arial";
+
+
+                grid = [[],[]];
+                for (var x=0; x<CELLS_WIDE; x++) {
+                    grid[0][x] = [];
+                    for (var y=0; y<CELLS_HIGH; y++) {
+                        grid[0][x][y] = gen;
+                    }
+                }
+
+                generateRandomCells(100);
+
+                requestAnimationFrame(loop);
+            };
+
+        </script>
+    </head>
+
+    <body>
+        <canvas id="canvas" width="512" height="512"></canvas>
+    </body>
+
+</html>
