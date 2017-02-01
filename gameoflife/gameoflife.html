@@ -72,7 +72,7 @@
 
             function loop() {
 
-                if (Date.now() > lastTick + 1000) {
+                if (Date.now() > lastTick + 100) {
                     nextGen();
                     lastTick = Date.now();
                 }
@@ -124,18 +124,7 @@
                 //console.log(nc);
             }
 
-            window.onload = function() {
-                canvas = document.getElementById("canvas");
-                canvas.width = CANVAS_WIDTH;
-                canvas.height = CANVAS_HEIGHT;
-                canvas.onmousedown = mouse_down;
-                canvas.onmousemove = mouse_move;
-
-                context = canvas.getContext("2d");
-                context.textBaseline = "top";
-                context.font = "16px Arial";
-
-
+            function init() {
                 grid = [[],[]];
                 for (var x=0; x<CELLS_WIDE; x++) {
                     grid[0][x] = [];
@@ -147,6 +136,24 @@
                 generateRandomCells(100);
 
                 requestAnimationFrame(loop);
+            }
+
+            window.onload = function() {
+                canvas = document.getElementById("canvas");
+                canvas.width = CANVAS_WIDTH;
+                canvas.height = CANVAS_HEIGHT;
+                canvas.onmousedown = mouse_down;
+                canvas.onmousemove = mouse_move;
+
+                context = canvas.getContext("2d");
+                context.textBaseline = "top";
+                context.font = "16px Arial";
+
+                init();
+            };
+
+            window.onresize = function() {
+                init();
             };
 
         </script>
